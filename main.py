@@ -12,33 +12,11 @@ init(autoreset=True)
 TOKEN = cfg.TOKEN  # Replace with your actual bot token
 bot = telebot.TeleBot(TOKEN)
 
-mat = ['bitch', 'fuck']
 
 # Connect to the SQLite database
 def connect_db():
     return sqlite3.connect(os.path.join(os.path.dirname(__file__), 'ad_list.db'))
 
-def check_for_mat(sentense, message):
-    words_list = sentense.split()
-    for word in range(len(words_list)):
-        words_list[word-1] = ''.join(list(dict.fromkeys(list(words_list[word-1].lower())))) #removing duplicates
-        if words_list[word-1] in mat:
-            try:
-                # Delete the offensive message
-                bot.delete_message(message.chat.id, message_id=message.message_id)
-
-                # Notify the user about the mute
-                bot.send_message(message.chat.id, f'@{message.from_user.username} muted because of mat')
-                bot.send_message(chat_id=cfg.ADMIN_ID, text=f'user: @{message.from_user.username};\ntext: {message.text}')
-
-                # Mute the user for 30 seconds
-                until_date = int((datetime.utcnow() + timedelta(seconds=30)).timestamp())
-                permissions = ChatPermissions(can_send_messages=False)
-                # bot.restrict_chat_member(message.chat.id, message.from_user.id, permissions, until_date=until_date)
-            except Exception as e:
-                print(f"Error muting user: {e}")
-        else:
-            pass
 
 def create_ad_list_table():
     conn = connect_db()
