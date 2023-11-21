@@ -2,9 +2,12 @@ import telebot
 import sqlite3
 import os
 import config as cfg
-from datetime import datetime, timedelta
-from telegram import ChatPermissions
-import g4f
+from datetime import datetime, timedelta, timezone
+import logging
+# from telegram import ChatPermissions
+# import g4f
+
+logging.basicConfig(filename='debug.log', level=logging.DEBUG)
 
 from colorama import Fore, init
 init(autoreset=True)
@@ -50,11 +53,12 @@ def check_if_ad(message):
         #         check_text_and_data(message)
         if len(message.text) >= 80:
                 # bot.send_message(chat_id=cfg.ADMIN_ID, text=f'user: @{message.from_user.username};\ntext: {message.text}\ndata: {message.date}')
+                logging.debug(f"Step check_if_ad passed")
                 check_text_and_data(message)
     except Exception as e:
         print(Fore.RED + f'check_if_ad error: {e}')
 
-def check_if_correct_message(message):
+def check_if_correct_message(message): #-- unwork
     try:
         response = g4f.ChatCompletion.create(
                 model="gpt-3.5-turbo",
@@ -79,9 +83,12 @@ def insert_data_in_db(message):
             cursor = conn.cursor()
             username = f'@{message.from_user.username}'
             text = f'{message.text}'
-            from_date = datetime.utcfromtimestamp(message.date).strftime('%Y-%m-%d %H:%M:%S')
-            until_date = (datetime.utcfromtimestamp(message.date) + timedelta(seconds=604800)).strftime('%Y-%m-%d %H:%M:%S')
-            telegrem_data = message.date + 60 #604800
+            
+            # Use timezone-aware objects to represent datetimes in UTC
+            from_date = datetime.utcfromtimestamp(message.date).replace(tzinfo=timezone.utc).strftime('%Y-%m-%d %H:%M:%S')
+            until_date = (datetime.utcfromtimestamp(message.date) + timedelta(seconds=604800)).replace(tzinfo=timezone.utc).strftime('%Y-%m-%d %H:%M:%S')
+            telegrem_data = message.date + 60  # 604800
+            
             # Execute the SQL command to insert data into the table
             cursor.execute('''
                 INSERT INTO ad_list (username, text, from_date, until_date, telegram_form_data)
@@ -104,20 +111,24 @@ def check_text_and_data(message):
             if existing_row:
                 # bot.send_message(chat_id=cfg.ADMIN_ID, text=f'time: {message.date-int(existing_row[5])}')
                 if message.date-int(existing_row[5]) < 0:
-                    bot.send_message(chat_id=cfg.ADMIN_ID, text=f'Duplicate:\n\n{str(existing_row)}')
+                    # bot.send_message(chat_id=cfg.ADMIN_ID, text=f'Duplicate:\n\n{str(existing_row)}')
+                    logging.debug("step check_text_and_data DUBLICATE passed")
                     delete_message(message, existing_row[1])
-                else:
-                    cursor.execute('DELETE FROM ad_list WHERE text = ?', (message.text,))
-                    conn.commit()
-                    # Insert data into the ad_list table
-                    insert_data_in_db(message)
+            else:
+
+                cursor.execute('DELETE FROM ad_list WHERE text = ?', (message.text,))
+                conn.commit()
+                # Insert data into the ad_list table
+                insert_data_in_db(message)
 
     except Exception as e:
         print(Fore.RED + f'check_text_and_data: {e}') 
 
 def delete_message(message, user):
-    bot.delete_message(chat_id=message.chat.id, message_id=message.id)
-    bot.send_message(chat_id=message.chat.id, text=f'{user} к сожелению нельзя постить рекламу чаше раза в неделю')
+    bot.send_message(chat_id=cfg.ADMIN_ID, text=f"{message.text}\n\nfrom user {user} need to be deleted")
+    logging.debug("Step delete_message passed")
+    # bot.delete_message(chat_id=message.chat.id, message_id=message.id)
+    # bot.send_message(chat_id=message.chat.id, text=f'{user} к сожелению нельзя постить рекламу чаше раза в неделю')
 
 @bot.message_handler(commands=['start', 'help'])
 def send_welcome(message):
